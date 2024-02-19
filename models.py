@@ -5,7 +5,7 @@ class PolygonTransformer(torch.nn.Module):
     def __init__(self, vertex_dim: int, num_heads: int, poly_dim: int):
         super().__init__()
         self.linear1 = torch.nn.Sequential(
-            torch.nn.Linear(4, vertex_dim),
+            torch.nn.Linear(2, vertex_dim),
             torch.nn.Tanh(),
             torch.nn.Linear(vertex_dim, vertex_dim),
             torch.nn.GELU(),
@@ -42,22 +42,33 @@ class PolygonTransformer(torch.nn.Module):
 
 class SpaceTransformer(torch.nn.Module):
     def __init__(
-        self, vertex_dim: int, num_heads: int, poly_dim: int, scales: int
+        self,
+        vertex_dim: int,
+        vertex_num_heads: int,
+        poly_dim: int,
+        polygon_num_heads,
+        scales: int,
     ) -> None:
         super().__init__()
-        self.poly_transformer = PolygonTransformer(vertex_dim, num_heads, poly_dim)
+        self.poly_transformer = PolygonTransformer(
+            vertex_dim, vertex_num_heads, poly_dim
+        )
         self.linear1 = torch.nn.Sequential(
             torch.nn.Linear(poly_dim, poly_dim),
             torch.nn.Tanh(),
             torch.nn.Linear(poly_dim, poly_dim),
             torch.nn.GELU(),
         )
-        self.attention1 = torch.nn.MultiheadAttention(poly_dim, num_heads, dropout=0.05)
+        self.attention1 = torch.nn.MultiheadAttention(
+            poly_dim, polygon_num_heads, dropout=0.05
+        )
         self.linear2 = torch.nn.Sequential(
             torch.nn.Linear(poly_dim, poly_dim),
             torch.nn.GELU(),
         )
-        self.attention2 = torch.nn.MultiheadAttention(poly_dim, num_heads, dropout=0.05)
+        self.attention2 = torch.nn.MultiheadAttention(
+            poly_dim, polygon_num_heads, dropout=0.05
+        )
         self.linear3 = torch.nn.Sequential(
             torch.nn.Linear(poly_dim, poly_dim),
             torch.nn.GELU(),
@@ -82,5 +93,5 @@ class SpaceTransformer(torch.nn.Module):
         x += self.attention2(x, x, x)
         x += self.linear3(x)
         x = self.linear4(x)  # for grid encoding we can use a RELU
-        x = self.linear5(x)  # [batch_size, num_polygons, 1+scales*2]
+        x = self.linear5(x)  # [batch_size, num_polygons, (1+scales*2)*2]
         # now we have to make encoding over rotation and translation (maybe we can use sinusoidal encoding) first i try grid encoding

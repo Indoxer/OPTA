@@ -53,7 +53,7 @@ class RealShapeGenerator:
         if fixed_seed is not None:
             seed(fixed_seed)
 
-    def get_first_n_polygons(self, n):
+    def get_next_n_polygons(self, n):
         return [self.get_polygon() for _ in range(n)]
 
     def load_fixed_shapes(self):
