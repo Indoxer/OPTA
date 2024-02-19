@@ -3,6 +3,7 @@ from typing import List
 import numpy as np
 import torch
 from shapely.geometry import Polygon
+from sympy import poly
 from tqdm import tqdm
 
 from models import SpaceTransformer
@@ -10,22 +11,24 @@ from polygons import RealShapeGenerator, Space
 
 
 def calc_loss(
-    polygons: List[Polygon], turns: np.array, positions: np.array, division_num: int
+    polygons: List[Polygon],
+    turns: torch.Tensor,
+    positions: torch.Tensor,
+    division_num: int,
 ):
     space = Space(division_num)
     for pol, turn, pos in zip(polygons, turns, positions):
+        pos = pos.clone().detach().numpy()
+        turn = turn.clone().detach().numpy()
         space.place(pol, turn, pos)
 
     return space.outliers + space.overlapping
 
 
 def polygons_to_tensor(polygons: List[Polygon]):
-    for pol in polygons:
-        
-    
-    polygons = [[[p for p in pol.exterior.coords]] for pol in polygons]
-    
-    return torch.tensor()
+    polygons = [torch.tensor([[p for p in pol.exterior.coords]]) for pol in polygons]
+
+    return polygons
 
 
 def train(steps: int, batch_size: int, division_num, n_polygons: int, lr=0.001):
@@ -35,43 +38,37 @@ def train(steps: int, batch_size: int, division_num, n_polygons: int, lr=0.001):
 
     opt = torch.optim.Adam(model.parameters(), lr)
 
-    last_propability = None
+    torch.autograd.set_detect_anomaly(True)
 
     for step in tqdm(range(steps)):
         opt.zero_grad()
 
-        polygons = [
-            polygons_to_tensor(generator.get_next_n_polygons(n_polygons))
-            for _ in range(batch_size)
-        ]
-        polygons = torch.tensor(polygons)
+        polygons = generator.get_next_n_polygons(n_polygons)
+        tpolygons = polygons_to_tensor(polygons)
 
-        out = model(polygons)  # [batch_size, n_polygons, 1+scales*2]
+        out = model(tpolygons)  # [n_polygons, (1+scales*2)*2]
 
-        shape = out.shape
-        size = shape[-1] // 2
+        size = out.shape[-1] // 2
 
-        std, mu = out.split(size)
-
-        shape[-1] = size
+        std = out[:, :size]
+        mu = out[:, size:]
 
         dist = torch.distributions.normal.Normal(mu, std)
 
         values = dist.rsample()
-        turns = values[:, :, 0]
-        positions = values[:, :, 1:]
+        turns = values[:, 0]
+        positions = values[:, 1:]
+        vertex_num = positions.shape[1]
+        positions = positions.view(-1, vertex_num // 2, 2)
 
-        losses = torch.zeros(batch_size)
-
-        for i in range(batch_size):
-            losses[i] = calc_loss(polygons, turns[i], positions[i], division_num)
+        loss = calc_loss(polygons, turns, positions, division_num)
 
         propability = torch.exp(dist.log_prob(torch.Tensor(values)))
-        loss = torch.log(propability) * losses
+        loss = torch.log(propability) * loss
 
         loss = loss.mean()
 
-        print(loss)
+        # print(loss)
 
         loss.backward()
         opt.step()

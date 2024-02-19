@@ -23,12 +23,12 @@ class Space:
             [(0.0, 0.0), (0.0, 1.0), (1.0, 1.0), (1.0, 0.0), (0.0, 0.0)]
         )
         self.division_table = np.array([1 / (2**i) for i in range(division)])
+        self.division_table = np.expand_dims(self.division_table, axis=1)
         self.division_table = softmax(self.division_table)
 
     def place(self, polygon: Polygon, turn: float, pos: np.array):
         polygon = shapely.affinity.rotate(polygon, turn * 2 * np.pi)
         pos = np.sum(pos * self.division_table, axis=1)
-        print(pos)
         polygon = shapely.affinity.translate(polygon, pos[0], pos[1])
 
         for pol2 in self.polygons:
