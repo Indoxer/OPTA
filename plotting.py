@@ -1,3 +1,4 @@
+import io
 import os
 
 import matplotlib.pyplot as plt
@@ -7,7 +8,7 @@ from matplotlib.path import Path
 from shapely.geometry import MultiPolygon, Polygon
 
 
-def show_in_pyplot(polygons, last_polygon=None, grid=False, size=1.5):
+def show_in_pyplot(polygons, last_polygon=None, grid=False, size=1.5, show=True):
     f = plt.figure()
     ax = f.gca()
     ax.set_aspect(1)
@@ -26,13 +27,18 @@ def show_in_pyplot(polygons, last_polygon=None, grid=False, size=1.5):
         )
         ax.add_patch(patch)
 
-    plt.xlim(-0.1, size)
-    plt.ylim(-0.1, size)
+    plt.xlim(-0.5, size)
+    plt.ylim(-0.5, size)
 
     if grid:
         plt.grid()
+    if show:
+        plt.show()
 
-    plt.show()
+    buf = io.BytesIO()
+    plt.savefig(buf, format="jpeg")
+    buf.seek(0)
+    return buf
 
 
 def make_compound_path(polygon):
