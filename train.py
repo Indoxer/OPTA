@@ -33,6 +33,7 @@ class Trainer:
         self.grad_accumulation_steps = grad_accumulation_steps
         self.avg_reward = 0
         self.avg_loss = 0
+        self.avg_std = 0
         self.avg_window = avg_window
 
     def calc_reward(
@@ -72,7 +73,7 @@ class Trainer:
         return polygons, tpolygons
 
     def step(self, polygons, tpolygons, step: int):
-        turns, positions, log_prob = self.model(tpolygons)
+        turns, positions, log_prob, std = self.model(tpolygons)
 
         reward = self.calc_reward(polygons, turns, positions)
 
@@ -90,19 +91,19 @@ class Trainer:
 
         self.avg_reward -= self.avg_reward / self.avg_window
         self.avg_reward += reward / self.avg_window
+        self.avg_std -= self.avg_std / self.avg_window
+        self.avg_std += std.mean() / self.avg_window
 
         self.logger.log_dict(
             {
-                "metrics/loss": loss,
-                "metrics/reward": reward,
                 "metrics/avg_reward": self.avg_reward,
                 "metrics/avg_loss": self.avg_loss,
-                "metrics/propability": log_prob.mean(),
+                "metrics/avg_std": self.avg_std,
             },
             step,
         )
 
-        if step % 250 == 0:
+        if step % 500 == 0:
             self.log_plot_polygons(polygons, turns, positions, step)
 
         if step % self.grad_accumulation_steps == 0:
@@ -123,12 +124,12 @@ def train():
 
     trainer = Trainer(
         model,
-        lr=0.003,
+        lr=0.001,
         division_num=division_num,
-        grad_accumulation_steps=10,
-        avg_window=40,
+        grad_accumulation_steps=5,
+        avg_window=150,
     )
-    trainer.fit(10000, 10)
+    trainer.fit(50000, 10)
 
 
 if __name__ == "__main__":
